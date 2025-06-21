@@ -48,13 +48,12 @@ services:
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
     environment:
-      # Минимально‑возможная конфигурация: SequentialExecutor + SQLite
-      AIRFLOW__CORE__EXECUTOR=SequentialExecutor
-      AIRFLOW__CORE__LOAD_EXAMPLES=False
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
-      _AIRFLOW_WWW_USER_USERNAME=admin
-      _AIRFLOW_WWW_USER_PASSWORD=admin
-      TZ=Europe/Moscow
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      TZ: Europe/Moscow
     command: >
       bash -c "\
         airflow db init && \
