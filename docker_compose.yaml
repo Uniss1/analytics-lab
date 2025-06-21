@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.7
+    container_name: clickhouse
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP interface
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      # Создаём базу по умолчанию и включаем управление пользователями через SQL
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      # (опционально) мягкий лимит памяти, чтобы не "съесть" весь 4‑ГБ сервер
+      - CLICKHOUSE_MAX_MEMORY_USAGE=1073741824   # 1 ГБ
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    environment:
+      # Выносим файл метаданных Metabase наружу, чтобы он переживал перезапуски
+      MB_DB_FILE: /metabase-data/metabase.db
+
+  airflow:
+    image: apache/airflow:2.7.2-python3.11
+    container_name: airflow
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - airflow_dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    environment:
+      # Минимально‑возможная конфигурация: SequentialExecutor + SQLite
+      AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES=False
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      _AIRFLOW_WWW_USER_USERNAME=admin
+      _AIRFLOW_WWW_USER_PASSWORD=admin
+      TZ=Europe/Moscow
+    command: >
+      bash -c "\
+        airflow db init && \
+        airflow users create \
+          --username ${_AIRFLOW_WWW_USER_USERNAME} \
+          --password ${_AIRFLOW_WWW_USER_PASSWORD} \
+          --firstname Admin --lastname User --role Admin --email admin@example.com && \
+        exec airflow webserver"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/health | grep 'healthy' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  clickhouse_data:
+  metabase_data:
+  airflow_dags:
+  airflow_logs:
+  airflow_plugins:
