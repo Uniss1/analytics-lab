@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   clickhouse:
@@ -16,9 +16,10 @@ services:
       # (опционально) мягкий лимит памяти, чтобы не "съесть" весь 4‑ГБ сервер
       - CLICKHOUSE_MAX_MEMORY_USAGE=1073741824   # 1 ГБ
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8123/ping || exit 1"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 5
 
   metabase:
@@ -48,12 +49,13 @@ services:
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
     environment:
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
-      _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: admin
-      TZ: Europe/Moscow
+      # Минимально‑возможная конфигурация: SequentialExecutor + SQLite
+      AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES=False
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      _AIRFLOW_WWW_USER_USERNAME=admin
+      _AIRFLOW_WWW_USER_PASSWORD=admin
+      TZ=Europe/Moscow
     command: >
       bash -c "\
         airflow db init && \
